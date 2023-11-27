@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Camera and Gallery</title>
+    <style>
+        #videoElement {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+        }
+
+        #gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .gallery-item {
+            width: 150px;
+            height: 150px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+
+<body>
+    <video id="videoElement" autoplay></video>
+    <div>
+        <button onclick="takePicture()">Take Picture</button>
+        <button onclick="startRecording()">Start Recording</button>
+        <button onclick="stopRecording()">Stop Recording</button>
+        <button onclick="clearData()">Clear Data</button>
+    </div>
+    <div id="gallery"></div>
+
+    <script>
+        let stream;
+        let recordedChunks = [];
+        let mediaRecorder;
+        let galleryData = JSON.parse(localStorage.getItem('galleryData')) || [];
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function (videoStream) {
+                stream = videoStream;
+                var video = document.getElementById('videoElement');
+                video.srcObject = stream;
+            })
+            .catch(function (err) {
+                console.log("Error: " + err);
+            });
+
+        function takePicture() {
+            var video = document.getElementById('videoElement');
+            var canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            var imageUrl = canvas.toDataURL('image/png');
+
+            galleryData.push({ type: 'image', data: imageUrl });
+            localStorage.setItem('galleryData', JSON.stringify(galleryData));
+
+            displayMedia('image', imageUrl);
+        }
+
+        function startRecording() {
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = function (event) {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            mediaRecorder.start();
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            mediaRecorder.onstop = function () {
+                var blob = new Blob(recordedChunks, { type: 'video/webm' });
+                var videoUrl = URL.createObjectURL(blob);
+
+                galleryData.push({ type: 'video', data: videoUrl });
+                localStorage.setItem('galleryData', JSON.stringify(galleryData));
+
+                displayMedia('video', videoUrl);
+            };
+        }
+
+        function displayMedia(type, url) {
+            var gallery = document.getElementById('gallery');
+            var galleryItem = document.createElement('div');
+            galleryItem.className = 'gallery-item';
+
+            if (type === 'image') {
+                var img = document.createElement('img');
+                img.src = url;
+                galleryItem.appendChild(img);
+            } else if (type === 'video') {
+                var video = document.createElement('video');
+                video.src = url;
+                video.controls = true;
+                video.loop = true;
+                video.autoplay = true;
+                galleryItem.appendChild(video);
+            }
+
+            gallery.appendChild(galleryItem);
+        }
+
+        // Display previously saved media on page load
+        galleryData.forEach(item => {
+            displayMedia(item.type, item.data);
+        });
+        function clearData() {
+            localStorage.removeItem('galleryData'); // Clearing the 'galleryData' from localStorage
+            galleryData = []; // Resetting the galleryData array
+            var gallery = document.getElementById('gallery');
+            gallery.innerHTML = ''; // Clearing the displayed gallery on the page
+        }
+
+        function displayMedia(type, url) {
+            var gallery = document.getElementById('gallery');
+            var galleryItem = document.createElement('div');
+            galleryItem.className = 'gallery-item';
+
+            if (type === 'image') {
+                var img = document.createElement('img');
+                img.src = url;
+                img.onclick = function () {
+                    openImage(url); // Open image in a larger view when clicked
+                };
+                galleryItem.appendChild(img);
+            } else if (type === 'video') {
+                var video = document.createElement('video');
+                video.src = url;
+                video.controls = true;
+                video.loop = true;
+                video.autoplay = false;
+                video.onclick = function () {
+                    playVideo(video); // Start playing the video when clicked
+                };
+                galleryItem.appendChild(video);
+            }
+
+            gallery.appendChild(galleryItem);
+        }
+
+      
+
+        function playVideo(videoElement) {
+            videoElement.play(); // Start playing the video
+        }
+
+        // Display previously saved media on page load
+        galleryData.forEach(item => {
+            displayMedia(item.type, item.data);
+        });
+        
+    </script>
+</body>
+
+</html>
